@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(claude-api)",
+      "Read(//c/Users/Shala/Desktop/**)",
+      "Bash(python3 -c \":*)",
+      "Bash(cd:*)",
+      "Skill(update-config)",
+      "Bash(find /c/Users/Shala/Desktop/schillings-agents -not -path */node_modules/* -not -path */outputs/* -newer /c/Users/Shala/Desktop/schillings-agents/package.json -type f)",
+      "Bash(find /c/Users/Shala/Desktop/schillings-agents -not -path */node_modules/* -not -path */outputs/* -type f -printf '%T@ %p\\\\n')",
+      "Bash(npm install:*)"
+    ]
+  }
+}

@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SCHILLING'S AGENTS</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
+<style>
+/* ── RESET & VARS ─────────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#1a1f3c; --dark:#0d1020; --panel:#141830;
+  --blue:#1B3A8C; --blue2:#4a90d9;
+  --red:#E8202A; --green:#64c850; --yellow:#f8d030;
+  --teal:#00aa88; --gray:#a0a8d0; --white:#f0f0f0; --cream:#f8f4e8;
+  --border:#000;
+  --font:'Press Start 2P',monospace;
+}
+html,body{height:100%;overflow:hidden;background:var(--dark);font-family:var(--font);color:var(--white);}
+
+/* scanlines */
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent 0,transparent 3px,rgba(0,0,0,.11) 3px,rgba(0,0,0,.11) 4px);}
+
+/* ── SCROLLBARS ───────────────────────────────────────────── */
+::-webkit-scrollbar{width:6px;height:6px;}
+::-webkit-scrollbar-track{background:var(--dark);}
+::-webkit-scrollbar-thumb{background:var(--blue);}
+
+/* ── APP SHELL ────────────────────────────────────────────── */
+#app{display:flex;flex-direction:column;height:100vh;}
+
+/* ── HEADER ───────────────────────────────────────────────── */
+#header{
+  height:48px;flex-shrink:0;
+  background:var(--dark);border-bottom:4px solid var(--border);
+  display:flex;align-items:center;padding:0 14px;gap:12px;
+}
+#logo{font-size:11px;color:var(--yellow);letter-spacing:2px;white-space:nowrap;}
+#logo-sub{font-size:7px;color:var(--gray);margin-left:6px;}
+.ver{font-size:6px;color:var(--green);animation:blink .9s step-end infinite;}
+#session-bar{flex:1;font-size:7px;color:var(--blue2);padding:0 10px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* tab buttons in header */
+.tab-btn{
+  font-family:var(--font);font-size:7px;padding:7px 12px;
+  background:var(--dark);color:var(--gray);
+  border:3px solid var(--gray);cursor:pointer;white-space:nowrap;
+  box-shadow:3px 3px 0 var(--border);letter-spacing:.5px;
+}
+.tab-btn.active{color:var(--yellow);border-color:var(--yellow);background:var(--bg);}
+.tab-btn:hover:not(.active){color:var(--white);border-color:var(--white);}
+
+/* ── TABS ─────────────────────────────────────────────────── */
+.tab-content{display:none;flex:1;overflow:hidden;}
+.tab-content.active{display:flex;flex-direction:column;}
+
+/* ══════════════════════════════════════════════════════════
+   ABA RODAR
+   ══════════════════════════════════════════════════════════ */
+#tab-run{background:var(--bg);padding:14px;gap:12px;}
+
+/* tema row */
+#run-top{display:flex;gap:10px;align-items:center;flex-shrink:0;}
+#topic-input{
+  flex:1;font-family:var(--font);font-size:8px;
+  background:var(--dark);color:var(--white);
+  border:3px solid var(--border);box-shadow:inset 2px 2px 0 #000;
+  padding:9px 12px;outline:none;
+}
+#topic-input:focus{border-color:var(--yellow);}
+#topic-input::placeholder{color:var(--gray);font-size:7px;}
+.run-btn{
+  font-family:var(--font);font-size:7px;padding:10px 14px;
+  border:3px solid;cursor:pointer;white-space:nowrap;
+  box-shadow:4px 4px 0 var(--border);background:var(--dark);
+  letter-spacing:.5px;
+}
+.run-btn:hover:not(:disabled){transform:translate(2px,2px);box-shadow:2px 2px 0 var(--border);}
+.run-btn:active:not(:disabled){transform:translate(4px,4px);box-shadow:none;}
+.run-btn:disabled{opacity:.35;cursor:not-allowed;}
+.btn-all{color:var(--red);border-color:var(--red);}
+.btn-all:hover:not(:disabled){background:rgba(232,32,42,.15);}
+.btn-sel{color:var(--yellow);border-color:var(--yellow);}
+.btn-sel:hover:not(:disabled){background:rgba(248,208,48,.12);}
+
+/* agents grid */
+#agents-grid{
+  display:grid;grid-template-columns:1fr 1fr;gap:8px;flex-shrink:0;
+}
+.agent-row{
+  display:flex;align-items:center;gap:8px;
+  background:var(--panel);border:3px solid var(--border);padding:8px 10px;
+}
+.agent-check{
+  width:16px;height:16px;background:var(--cream);
+  border:3px solid var(--border);box-shadow:2px 2px 0 #000;
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;font-size:8px;color:var(--border);
+}
+.agent-check.on{background:var(--green);}
+.agent-name{font-size:7px;color:var(--yellow);width:68px;flex-shrink:0;}
+/* EXP bar */
+.exp-wrap{flex:1;height:10px;background:var(--dark);border:2px solid var(--border);position:relative;overflow:hidden;}
+.exp-fill{height:100%;width:0%;transition:none;background:var(--green);}
+.exp-fill.idle   {background:var(--dark);width:0%;}
+.exp-fill.running{background:var(--yellow);width:55%;animation:expBlink .4s step-end infinite;}
+.exp-fill.done   {background:var(--green);width:100%;}
+.exp-fill.error  {background:var(--red);width:100%;}
+.exp-fill.aprovado{background:var(--teal);width:100%;}
+.agent-status{font-size:5px;color:var(--gray);width:52px;flex-shrink:0;text-align:right;white-space:nowrap;}
+
+/* log */
+#log-wrap{flex:1;display:flex;flex-direction:column;min-height:0;}
+#log-header{font-size:6px;color:var(--gray);padding:4px 0 6px;flex-shrink:0;letter-spacing:1px;}
+#log{
+  flex:1;background:var(--dark);border:3px solid var(--border);
+  overflow-y:auto;padding:10px;font-size:7px;line-height:2;
+  box-shadow:inset 3px 3px 0 #000;
+}
+.log-line{color:var(--gray);}
+.log-line.start {color:var(--blue2);}
+.log-line.running{color:var(--yellow);}
+.log-line.done  {color:var(--green);}
+.log-line.error {color:var(--red);}
+.log-line.end   {color:var(--white);}
+.log-cursor{animation:blink .7s step-end infinite;color:var(--yellow);}
+
+/* ══════════════════════════════════════════════════════════
+   ABA REVISAR
+   ══════════════════════════════════════════════════════════ */
+#tab-review{flex-direction:row;background:var(--bg);}
+
+/* sidebar */
+#sidebar{
+  width:210px;flex-shrink:0;border-right:4px solid var(--border);
+  display:flex;flex-direction:column;background:var(--panel);overflow:hidden;
+}
+#sidebar-header{
+  padding:10px 10px;background:var(--dark);border-bottom:3px solid var(--border);
+  font-size:6px;color:var(--yellow);letter-spacing:1px;flex-shrink:0;
+}
+#session-list{flex:1;overflow-y:auto;}
+.sess-item{
+  padding:9px 10px;border-bottom:2px solid var(--bg);cursor:pointer;
+}
+.sess-item:hover{background:rgba(74,144,217,.18);}
+.sess-item.active{background:rgba(100,200,80,.14);border-left:4px solid var(--green);}
+.sess-date{font-size:5px;color:var(--blue2);margin-bottom:3px;}
+.sess-topic{font-size:6px;color:var(--white);line-height:1.7;word-break:break-word;}
+
+/* review main */
+#review-main{flex:1;display:flex;flex-direction:column;overflow:hidden;}
+
+/* agent tabs */
+#agent-tabs{
+  display:flex;flex-shrink:0;border-bottom:4px solid var(--border);
+  background:var(--dark);overflow-x:auto;
+  scrollbar-width:none;
+}
+#agent-tabs::-webkit-scrollbar{display:none;}
+.atab{
+  font-family:var(--font);font-size:6px;padding:10px 12px;
+  background:var(--dark);color:var(--gray);border:none;
+  border-right:3px solid var(--border);cursor:pointer;white-space:nowrap;
+  flex-shrink:0;letter-spacing:.5px;position:relative;
+}
+.atab:hover:not(.active){color:var(--white);background:var(--panel);}
+.atab.active{color:var(--yellow);background:var(--bg);border-top:3px solid var(--yellow);}
+.atab .badge{
+  display:inline-block;width:6px;height:6px;margin-left:5px;vertical-align:middle;
+}
+.badge-ok   {background:var(--green);}
+.badge-err  {background:var(--red);}
+.badge-wait {background:var(--yellow);}
+.badge-none {background:var(--gray);opacity:.4;}
+
+/* content area */
+#review-body{flex:1;display:flex;flex-direction:column;overflow:hidden;padding:12px;gap:10px;}
+
+#content-area{flex:1;display:flex;min-height:0;gap:10px;}
+
+textarea#content-txt{
+  flex:1;font-family:var(--font);font-size:8px;line-height:2;
+  background:var(--cream);color:#1a1a2a;
+  border:3px solid var(--border);box-shadow:inset 3px 3px 0 #aaa;
+  padding:12px;resize:none;outline:none;
+}
+textarea#content-txt:focus{border-color:var(--blue2);}
+textarea#content-txt[disabled]{opacity:.5;}
+
+/* design image panel */
+#design-img-wrap{display:none;flex-direction:column;align-items:center;gap:8px;flex-shrink:0;}
+#design-img-wrap.show{display:flex;}
+#design-img{
+  width:220px;height:220px;object-fit:contain;
+  border:4px solid var(--border);box-shadow:4px 4px 0 #000;
+  cursor:zoom-in;image-rendering:pixelated;background:#111;
+}
+
+/* status badge */
+#content-status{
+  font-size:6px;padding:4px 10px;border:3px solid;letter-spacing:1px;flex-shrink:0;
+  align-self:flex-start;
+}
+#content-status.aguardando{color:var(--gray);border-color:var(--gray);}
+#content-status.aprovado{color:var(--green);border-color:var(--green);}
+#content-status.rejeitado{color:var(--red);border-color:var(--red);}
+#content-status.gerando{color:var(--yellow);border-color:var(--yellow);animation:blink .5s step-end infinite;}
+#content-status.ausente{color:var(--gray);border-color:var(--gray);opacity:.5;}
+
+/* review footer */
+#review-footer{
+  flex-shrink:0;display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;
+  border-top:3px solid var(--border);padding-top:10px;
+}
+.fb-group{flex:1;min-width:200px;display:flex;flex-direction:column;gap:5px;}
+.fb-lbl{font-size:6px;color:var(--gray);}
+.fb-input{
+  font-family:var(--font);font-size:7px;
+  background:var(--dark);color:var(--white);
+  border:3px solid var(--border);box-shadow:inset 2px 2px 0 #000;
+  padding:7px 10px;outline:none;
+}
+.fb-input:focus{border-color:var(--blue2);}
+.fb-actions{display:flex;gap:8px;flex-wrap:wrap;}
+.mbtn{
+  font-family:var(--font);font-size:7px;padding:9px 14px;
+  border:3px solid;cursor:pointer;
+  box-shadow:4px 4px 0 var(--border);background:var(--dark);
+  letter-spacing:.5px;white-space:nowrap;
+}
+.mbtn:hover:not(:disabled){transform:translate(2px,2px);box-shadow:2px 2px 0 var(--border);}
+.mbtn:active:not(:disabled){transform:translate(4px,4px);box-shadow:none;}
+.mbtn:disabled{opacity:.35;cursor:not-allowed;}
+.mbtn-ok{color:var(--green);border-color:var(--green);}
+.mbtn-ok:hover:not(:disabled){background:rgba(100,200,80,.15);}
+.mbtn-ng{color:var(--red);border-color:var(--red);}
+.mbtn-ng:hover:not(:disabled){background:rgba(232,32,42,.15);}
+.mbtn-rr{color:var(--yellow);border-color:var(--yellow);}
+.mbtn-rr:hover:not(:disabled){background:rgba(248,208,48,.1);}
+.mbtn-bk{color:var(--gray);border-color:var(--gray);}
+
+/* empty state */
+#review-empty{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  font-size:8px;color:var(--gray);text-align:center;line-height:2.5;
+}
+
+/* ── LIGHTBOX ─────────────────────────────────────────────── */
+#lightbox{
+  display:none;position:fixed;inset:0;z-index:200;
+  background:rgba(0,0,0,.94);align-items:center;justify-content:center;cursor:zoom-out;
+}
+#lightbox.open{display:flex;}
+#lightbox img{max-width:90vw;max-height:90vh;image-rendering:pixelated;
+  border:4px solid var(--border);box-shadow:8px 8px 0 #000;}
+
+/* ── LANG TOGGLE ──────────────────────────────────────────── */
+#lang-toggle{
+  display:flex;border:3px solid var(--gray);box-shadow:2px 2px 0 var(--border);flex-shrink:0;
+}
+.lang-opt{
+  font-family:var(--font);font-size:6px;padding:5px 8px;
+  background:var(--dark);color:var(--gray);border:none;cursor:pointer;letter-spacing:.5px;
+}
+.lang-opt.active{background:var(--blue);color:var(--white);}
+.lang-opt:first-child{border-right:3px solid var(--gray);}
+
+/* ── ANIMATIONS ───────────────────────────────────────────── */
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes expBlink{0%,100%{opacity:1}50%{opacity:.4}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ── HEADER ── -->
+  <div id="header">
+    <div id="logo">SCHILLING'S<span id="logo-sub"> AGENTS</span><span class="ver"> v2.0</span></div>
+    <div id="session-bar">▸ nenhuma sessão ativa</div>
+    <button class="tab-btn active" id="btn-run"    onclick="switchTab('run')">⚔ RODAR</button>
+    <button class="tab-btn"        id="btn-review" onclick="switchTab('review')">◈ REVISAR</button>
+    <div id="lang-toggle">
+      <button class="lang-opt active" id="lopt-pt" onclick="setLang('pt')">PT</button>
+      <button class="lang-opt"        id="lopt-en" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       ABA RODAR
+       ══════════════════════════════════════════════════════ -->
+  <div class="tab-content active" id="tab-run">
+
+    <!-- tema + botões -->
+    <div id="run-top">
+      <input type="text" id="topic-input" placeholder="ex: inglês para entrevista offshore..." />
+      <button class="run-btn btn-all" onclick="runAll()">⚔ RUN ALL</button>
+      <button class="run-btn btn-sel" onclick="runSelected()">▶ SELECIONADOS</button>
+    </div>
+
+    <!-- agents grid -->
+    <div id="agents-grid">
+      <!-- preenchido pelo JS -->
+    </div>
+
+    <!-- log -->
+    <div id="log-wrap">
+      <div id="log-header">▸ LOG DO SISTEMA</div>
+      <div id="log"><span class="log-line start">Sistema pronto. Digite um tema e pressione RUN ALL.</span><span class="log-cursor"> ▌</span></div>
+    </div>
+
+  </div><!-- /tab-run -->
+
+  <!-- ══════════════════════════════════════════════════════
+       ABA REVISAR
+       ══════════════════════════════════════════════════════ -->
+  <div class="tab-content" id="tab-review">
+
+    <!-- sidebar: sessões -->
+    <div id="sidebar">
+      <div id="sidebar-header">▸ SESSÕES</div>
+      <div id="session-list"></div>
+    </div>
+
+    <!-- main review -->
+    <div id="review-main">
+
+      <!-- empty state (antes de selecionar sessão) -->
+      <div id="review-empty">← selecione uma sessão<br>para revisar o conteúdo</div>
+
+      <!-- review panel (oculto até sessão ser selecionada) -->
+      <div id="review-panel" style="display:none;flex:1;flex-direction:column;overflow:hidden;">
+
+        <!-- agent tabs -->
+        <div id="agent-tabs">
+          <!-- preenchido pelo JS -->
+        </div>
+
+        <!-- body -->
+        <div id="review-body">
+          <div style="display:flex;align-items:center;gap:10px;flex-shrink:0;">
+            <div id="content-status" class="aguardando">AGUARDANDO</div>
+          </div>
+          <div id="content-area">
+            <textarea id="content-txt" placeholder="sem conteúdo gerado..."></textarea>
+            <div id="design-img-wrap">
+              <img id="design-img" src="" alt="design" onclick="openLightbox(this.src)"/>
+              <div style="font-size:5px;color:var(--gray);text-align:center;letter-spacing:2px;">CLICK = ZOOM</div>
+            </div>
+          </div>
+          <div id="review-footer">
+            <div class="fb-group">
+              <div class="fb-lbl">▸ FEEDBACK PARA REJEIÇÃO / RERUN</div>
+              <input type="text" class="fb-input" id="feedback-input" placeholder="descreva o ajuste..."/>
+            </div>
+            <div class="fb-actions">
+              <button class="mbtn mbtn-ok" onclick="doApprove()">✓ APROVAR</button>
+              <button class="mbtn mbtn-ng" onclick="doReject()">✗ REJEITAR</button>
+              <button class="mbtn mbtn-rr" id="btn-rerun" onclick="doRerun()">↺ REGERAR</button>
+            </div>
+          </div>
+        </div>
+
+      </div><!-- /review-panel -->
+
+    </div><!-- /review-main -->
+
+  </div><!-- /tab-review -->
+
+</div><!-- /app -->
+
+<!-- lightbox -->
+<div id="lightbox" onclick="closeLightbox()">
+  <img id="lb-img" src="" alt=""/>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════
+const AGENTS = [
+  { id:'copy',    label:'COPY'     },
+  { id:'posts',   label:'POSTS'    },
+  { id:'seo',     label:'SEO'      },
+  { id:'linkedin',label:'LINKEDIN' },
+  { id:'email',   label:'EMAIL'    },
+  { id:'funil',   label:'FUNIL'    },
+  { id:'anuncio', label:'ADS'      },
+  { id:'design',  label:'DESIGN'   },
+];
+
+// ═══════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════
+let activeTab      = 'run';
+let currentSession = null;   // {date, topic}
+let currentAgent   = 'copy';
+let selectedAgents = new Set(AGENTS.map(a => a.id));
+let sseSource      = null;
+let agentStatuses  = {};     // {agentId: status}
+
+// ═══════════════════════════════════════════════════
+// TAB SWITCHING
+// ═══════════════════════════════════════════════════
+function switchTab(tab) {
+  activeTab = tab;
+  document.getElementById('tab-run').classList.toggle('active', tab === 'run');
+  document.getElementById('tab-review').classList.toggle('active', tab === 'review');
+  document.getElementById('btn-run').classList.toggle('active', tab === 'run');
+  document.getElementById('btn-review').classList.toggle('active', tab === 'review');
+  if (tab === 'review') loadSessions();
+}
+
+// ═══════════════════════════════════════════════════
+// BUILD RUN TAB
+// ═══════════════════════════════════════════════════
+function buildAgentsGrid() {
+  const grid = document.getElementById('agents-grid');
+  grid.innerHTML = AGENTS.map(ag => `
+    <div class="agent-row">
+      <div class="agent-check on" id="chk-${ag.id}" onclick="toggleAgent('${ag.id}')">✓</div>
+      <div class="agent-name">${ag.label}</div>
+      <div class="exp-wrap"><div class="exp-fill idle" id="exp-${ag.id}"></div></div>
+      <div class="agent-status" id="ast-${ag.id}">${t('s_idle')}</div>
+    </div>
+  `).join('');
+}
+
+function toggleAgent(id) {
+  const el = document.getElementById(`chk-${id}`);
+  if (selectedAgents.has(id)) {
+    selectedAgents.delete(id);
+    el.classList.remove('on');
+    el.textContent = '□';
+  } else {
+    selectedAgents.add(id);
+    el.classList.add('on');
+    el.textContent = '✓';
+  }
+}
+
+function setAgentBar(id, status) {
+  agentStatuses[id] = status;
+  const fill = document.getElementById(`exp-${id}`);
+  const lbl  = document.getElementById(`ast-${id}`);
+  if (!fill) return;
+
+  const map = {
+    idle:      ['idle',    'PRONTO'],
+    running:   ['running', 'GERANDO'],
+    gerando:   ['running', 'GERANDO'],
+    done:      ['done',    'PRONTO'],
+    aguardando:['done',    'PRONTO'],
+    error:     ['error',   'ERRO'],
+    aprovado:  ['aprovado','APROVADO'],
+    rejeitado: ['error',   'REJEIT.'],
+  };
+  const [cls] = map[status] || ['idle'];
+  fill.className = `exp-fill ${cls}`;
+  if (lbl) lbl.textContent = barLabel(status);
+
+  // sync badge in review tabs
+  updateAgentBadge(id, status);
+}
+
+// ═══════════════════════════════════════════════════
+// LOG
+// ═══════════════════════════════════════════════════
+function logLine(text, cls = '') {
+  const log = document.getElementById('log');
+  // remove cursor while appending
+  const cursor = log.querySelector('.log-cursor');
+  if (cursor) cursor.remove();
+  const line = document.createElement('div');
+  line.className = `log-line ${cls}`;
+  line.textContent = text;
+  log.appendChild(line);
+  // re-add cursor
+  const c = document.createElement('span');
+  c.className = 'log-cursor';
+  c.textContent = ' ▌';
+  log.appendChild(c);
+  log.scrollTop = log.scrollHeight;
+}
+
+// ═══════════════════════════════════════════════════
+// RUN (SSE)
+// ═══════════════════════════════════════════════════
+function toSlug(t) {
+  return t.toLowerCase().normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+}
+function todayStr() { return new Date().toISOString().slice(0,10); }
+
+function runAll() {
+  const topic = document.getElementById('topic-input').value.trim();
+  if (!topic) { logLine(t('l_topic_missing'), 'error'); return; }
+  startRun(topic, AGENTS.map(a => a.id));
+}
+
+function runSelected() {
+  const topic = document.getElementById('topic-input').value.trim();
+  if (!topic) { logLine(t('l_topic_missing'), 'error'); return; }
+  if (!selectedAgents.size) { logLine(t('l_agent_missing'), 'error'); return; }
+  startRun(topic, [...selectedAgents]);
+}
+
+function startRun(topic, agents) {
+  if (sseSource) { sseSource.close(); sseSource = null; }
+
+  const slug = toSlug(topic);
+  const date = todayStr();
+  currentSession = { date, topic: slug };
+
+  document.getElementById('session-bar').textContent = `▸ ${topic} · ${date}`;
+  AGENTS.forEach(a => setAgentBar(a.id, 'idle'));
+
+  const log = document.getElementById('log');
+  log.innerHTML = '';
+
+  logLine(t('l_starting', topic), 'start');
+
+  const url = `/api/run?topic=${encodeURIComponent(topic)}&agents=${agents.join(',')}&date=${date}`;
+  sseSource = new EventSource(url);
+
+  sseSource.onmessage = (e) => {
+    const d = JSON.parse(e.data);
+    if (d.agent === '_start') {
+      logLine(d.message, 'start');
+    } else if (d.agent === '_end') {
+      logLine('─'.repeat(40), '');
+      logLine(d.message, 'end');
+      sseSource.close(); sseSource = null;
+      AGENTS.forEach(a => {
+        const fill = document.getElementById(`exp-${a.id}`);
+        if (fill && fill.classList.contains('running')) setAgentBar(a.id, 'idle');
+      });
+      loadSessions();
+    } else {
+      switch (d.status) {
+        case 'running': setAgentBar(d.agent, 'running'); logLine(`  ${d.message}`, 'running'); break;
+        case 'done':    setAgentBar(d.agent, 'done');    logLine(`✓ ${d.message}`, 'done');    break;
+        case 'error':   setAgentBar(d.agent, 'error');   logLine(`✗ ${d.message}`, 'error');   break;
+      }
+    }
+  };
+
+  sseSource.onerror = () => {
+    logLine(t('l_lost'), 'error');
+    sseSource.close(); sseSource = null;
+  };
+}
+
+// ═══════════════════════════════════════════════════
+// SESSIONS
+// ═══════════════════════════════════════════════════
+async function loadSessions() {
+  const sessions = await fetch('/api/sessions').then(r=>r.json()).catch(()=>[]);
+  const list = document.getElementById('session-list');
+  if (!sessions.length) {
+    list.innerHTML = `<div style="padding:12px;font-size:6px;color:var(--gray);text-align:center;line-height:2">${t('no_sessions')}</div>`;
+    return;
+  }
+  list.innerHTML = sessions.map(s => `
+    <div class="sess-item${currentSession?.date===s.date&&currentSession?.topic===s.topic?' active':''}"
+         onclick="selectSession('${s.date}','${s.topic}')">
+      <div class="sess-date">${s.date}</div>
+      <div class="sess-topic">${s.topic.replace(/-/g,' ')}</div>
+    </div>
+  `).join('');
+}
+
+async function selectSession(date, topic) {
+  currentSession = { date, topic };
+  document.getElementById('session-bar').textContent = `▸ ${topic.replace(/-/g,' ')} · ${date}`;
+  document.querySelectorAll('.sess-item').forEach(el => {
+    const d = el.querySelector('.sess-date')?.textContent;
+    const t = el.querySelector('.sess-topic')?.textContent;
+    el.classList.toggle('active', d === date && t === topic.replace(/-/g,' '));
+  });
+
+  // load agent statuses
+  const agents = await fetch(`/api/session/${date}/${topic}`).then(r=>r.json()).catch(()=>[]);
+  if (Array.isArray(agents)) {
+    agents.forEach(({agent, status}) => {
+      agentStatuses[agent] = status;
+      setAgentBar(agent, status);
+    });
+  }
+
+  // show review panel
+  document.getElementById('review-empty').style.display = 'none';
+  const panel = document.getElementById('review-panel');
+  panel.style.display = 'flex';
+
+  // build tabs
+  buildAgentTabs(agents || []);
+
+  // load first available agent
+  const first = agents?.find(a => a.exists) || agents?.[0];
+  if (first) selectAgentTab(first.agent);
+}
+
+// ═══════════════════════════════════════════════════
+// AGENT TABS (REVISAR)
+// ═══════════════════════════════════════════════════
+function badgeClass(status) {
+  if (!status || status === 'ausente') return 'badge-none';
+  if (status === 'aprovado') return 'badge-ok';
+  if (status === 'rejeitado' || status === 'error') return 'badge-err';
+  if (status === 'gerando' || status === 'running') return 'badge-wait';
+  return 'badge-none';
+}
+
+function buildAgentTabs(agentList) {
+  const wrap = document.getElementById('agent-tabs');
+  wrap.innerHTML = AGENTS.map(ag => {
+    const info   = agentList.find(a => a.agent === ag.id) || {};
+    const status = agentStatuses[ag.id] || info.status || 'ausente';
+    return `<button class="atab${currentAgent===ag.id?' active':''}" id="atab-${ag.id}"
+      onclick="selectAgentTab('${ag.id}')">
+      ${ag.label}<span class="badge ${badgeClass(status)}" id="badge-${ag.id}"></span>
+    </button>`;
+  }).join('');
+}
+
+function updateAgentBadge(id, status) {
+  const badge = document.getElementById(`badge-${id}`);
+  if (badge) badge.className = `badge ${badgeClass(status)}`;
+}
+
+async function selectAgentTab(agentId) {
+  currentAgent = agentId;
+
+  // update tab active state
+  document.querySelectorAll('.atab').forEach(t => {
+    t.classList.toggle('active', t.id === `atab-${agentId}`);
+  });
+
+  if (!currentSession) return;
+  const { date, topic } = currentSession;
+
+  // design tab: show image panel
+  const imgWrap = document.getElementById('design-img-wrap');
+  const txtArea = document.getElementById('content-txt');
+  if (agentId === 'design') {
+    imgWrap.classList.add('show');
+    document.getElementById('design-img').src = `/api/image/${date}/${topic}?t=${Date.now()}`;
+  } else {
+    imgWrap.classList.remove('show');
+  }
+
+  // load content
+  const data = await fetch(`/api/content/${date}/${topic}/${agentId}`)
+    .then(r => r.json()).catch(() => ({ error: true }));
+
+  txtArea.value = data.error ? '' : (data.content || '');
+  txtArea.disabled = (agentId === 'design');
+
+  const status = data.error ? 'ausente' : (data.status || 'aguardando');
+  const badge = document.getElementById('content-status');
+  badge.textContent = t(`b_${status}`) || status.toUpperCase();
+  badge.className = status;
+
+  // update agent's bar to reflect loaded status
+  if (status && status !== 'ausente') setAgentBar(agentId, status);
+
+  document.getElementById('feedback-input').value = '';
+}
+
+// ═══════════════════════════════════════════════════
+// APPROVE / REJECT / RERUN
+// ═══════════════════════════════════════════════════
+async function doApprove() {
+  if (!currentSession || !currentAgent) return;
+  const { date, topic } = currentSession;
+  const txt = document.getElementById('content-txt');
+
+  // save edits first (if not design)
+  if (currentAgent !== 'design') {
+    await fetch(`/api/content-save/${date}/${topic}/${currentAgent}`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ content: txt.value }),
+    }).catch(()=>{});
+  }
+
+  const r = await fetch(`/api/approve/${date}/${topic}/${currentAgent}`, {method:'POST'})
+    .then(r=>r.json()).catch(()=>({ok:false}));
+
+  if (r.ok) {
+    setAgentBar(currentAgent, 'aprovado');
+    const badge = document.getElementById('content-status');
+    badge.textContent = t('b_aprovado'); badge.className = 'aprovado';
+    logLine(t('l_approved', currentAgent.toUpperCase()), 'done');
+  }
+}
+
+async function doReject() {
+  if (!currentSession || !currentAgent) return;
+  const { date, topic } = currentSession;
+  const fb = document.getElementById('feedback-input').value || '';
+
+  const r = await fetch(`/api/reject/${date}/${topic}/${currentAgent}`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ feedback: fb }),
+  }).then(r=>r.json()).catch(()=>({ok:false}));
+
+  if (r.ok) {
+    setAgentBar(currentAgent, 'rejeitado');
+    const badge = document.getElementById('content-status');
+    badge.textContent = t('b_rejeitado'); badge.className = 'rejeitado';
+    logLine(t('l_rejected', currentAgent.toUpperCase()), 'error');
+  }
+}
+
+async function doRerun() {
+  if (!currentSession || !currentAgent) return;
+  const { date, topic } = currentSession;
+  const fb = document.getElementById('feedback-input').value || '';
+  const btn = document.getElementById('btn-rerun');
+
+  btn.disabled = true; btn.textContent = t('btn_rerunning');
+  setAgentBar(currentAgent, 'running');
+  const badge = document.getElementById('content-status');
+  badge.textContent = t('b_gerando'); badge.className = 'gerando';
+  logLine(t('l_rerunning', currentAgent.toUpperCase()), 'running');
+
+  const r = await fetch(`/api/rerun/${date}/${topic}/${currentAgent}`, {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ feedback: fb }),
+  }).then(r=>r.json()).catch(e=>({ok:false,error:e.message}));
+
+  btn.disabled = false; btn.textContent = t('btn_rerun');
+
+  if (r.ok !== false) {
+    document.getElementById('content-txt').value = r.output || '';
+    if (currentAgent === 'design')
+      document.getElementById('design-img').src = `/api/image/${date}/${topic}?t=${Date.now()}`;
+    setAgentBar(currentAgent, 'done');
+    badge.textContent = t('b_aguardando'); badge.className = 'aguardando';
+    logLine(t('l_rerun_done', currentAgent.toUpperCase()), 'done');
+  } else {
+    setAgentBar(currentAgent, 'error');
+    badge.textContent = t('b_rejeitado'); badge.className = 'rejeitado';
+    logLine(t('l_rerun_err', r.error || (lang==='en'?'unknown':'desconhecido')), 'error');
+  }
+}
+
+// ═══════════════════════════════════════════════════
+// LIGHTBOX
+// ═══════════════════════════════════════════════════
+function openLightbox(src) {
+  document.getElementById('lb-img').src = src;
+  document.getElementById('lightbox').classList.add('open');
+}
+function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); }
+
+// ═══════════════════════════════════════════════════
+// KEYBOARD
+// ═══════════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'Enter' && document.activeElement === document.getElementById('topic-input')) runAll();
+});
+
+// ═══════════════════════════════════════════════════
+// I18N
+// ═══════════════════════════════════════════════════
+let lang = localStorage.getItem('sa-lang') || 'pt';
+
+const STRINGS = {
+  pt: {
+    tab_run:          '⚔ RODAR',
+    tab_review:       '◈ REVISAR',
+    no_session:       '▸ nenhuma sessão ativa',
+    btn_all:          '⚔ RUN ALL',
+    btn_sel:          '▶ SELECIONADOS',
+    topic_ph:         'ex: inglês para entrevista offshore...',
+    log_header:       '▸ LOG DO SISTEMA',
+    log_ready:        'Sistema pronto. Digite um tema e pressione RUN ALL.',
+    sidebar_header:   '▸ SESSÕES',
+    no_sessions:      'nenhuma sessão',
+    review_empty:     '← selecione uma sessão\npara revisar o conteúdo',
+    fb_label:         '▸ FEEDBACK PARA REJEIÇÃO / RERUN',
+    fb_ph:            'descreva o ajuste...',
+    btn_approve:      '✓ APROVAR',
+    btn_reject:       '✗ REJEITAR',
+    btn_rerun:        '↺ REGERAR',
+    btn_rerunning:    '⏳ GERANDO',
+    zoom_hint:        'CLICK = ZOOM',
+    // agent bar statuses
+    s_idle:           'PRONTO',
+    s_running:        'GERANDO',
+    s_done:           'PRONTO',
+    s_error:          'ERRO',
+    s_aprovado:       'APROVADO',
+    s_rejeitado:      'REJEIT.',
+    // content badge
+    b_aguardando:     'AGUARDANDO',
+    b_aprovado:       'APROVADO',
+    b_rejeitado:      'REJEITADO',
+    b_gerando:        'GERANDO',
+    b_ausente:        'AUSENTE',
+    // log
+    l_topic_missing:  '! Digite o tema antes de rodar.',
+    l_agent_missing:  '! Selecione pelo menos 1 agente.',
+    l_starting:       (t) => `▶ Iniciando para: "${t}"`,
+    l_lost:           '✗ Conexão com servidor perdida.',
+    l_approved:       (a) => `✓ ${a} aprovado.`,
+    l_rejected:       (a) => `✗ ${a} rejeitado.`,
+    l_rerunning:      (a) => `↺ Regerando ${a}...`,
+    l_rerun_done:     (a) => `✓ ${a} regerado!`,
+    l_rerun_err:      (e) => `✗ Erro: ${e}`,
+    loading:          'carregando...',
+  },
+  en: {
+    tab_run:          '⚔ RUN',
+    tab_review:       '◈ REVIEW',
+    no_session:       '▸ no active session',
+    btn_all:          '⚔ RUN ALL',
+    btn_sel:          '▶ SELECTED',
+    topic_ph:         'e.g.: english for offshore interview...',
+    log_header:       '▸ SYSTEM LOG',
+    log_ready:        'System ready. Type a topic and press RUN ALL.',
+    sidebar_header:   '▸ SESSIONS',
+    no_sessions:      'no sessions',
+    review_empty:     '← select a session\nto review the content',
+    fb_label:         '▸ FEEDBACK FOR REJECTION / RERUN',
+    fb_ph:            'describe the adjustment...',
+    btn_approve:      '✓ APPROVE',
+    btn_reject:       '✗ REJECT',
+    btn_rerun:        '↺ REGENERATE',
+    btn_rerunning:    '⏳ GENERATING',
+    zoom_hint:        'CLICK = ZOOM',
+    s_idle:           'READY',
+    s_running:        'GENERATING',
+    s_done:           'READY',
+    s_error:          'ERROR',
+    s_aprovado:       'APPROVED',
+    s_rejeitado:      'REJECTED',
+    b_aguardando:     'WAITING',
+    b_aprovado:       'APPROVED',
+    b_rejeitado:      'REJECTED',
+    b_gerando:        'GENERATING',
+    b_ausente:        'ABSENT',
+    l_topic_missing:  '! Type a topic before running.',
+    l_agent_missing:  '! Select at least 1 agent.',
+    l_starting:       (t) => `▶ Starting for: "${t}"`,
+    l_lost:           '✗ Connection to server lost.',
+    l_approved:       (a) => `✓ ${a} approved.`,
+    l_rejected:       (a) => `✗ ${a} rejected.`,
+    l_rerunning:      (a) => `↺ Regenerating ${a}...`,
+    l_rerun_done:     (a) => `✓ ${a} regenerated!`,
+    l_rerun_err:      (e) => `✗ Error: ${e}`,
+    loading:          'loading...',
+  },
+};
+
+function t(key, arg) {
+  const v = STRINGS[lang]?.[key] ?? STRINGS.pt[key] ?? key;
+  return typeof v === 'function' ? v(arg) : v;
+}
+
+function setLang(l) {
+  lang = l;
+  localStorage.setItem('sa-lang', l);
+  document.documentElement.lang = l === 'en' ? 'en' : 'pt-BR';
+  document.getElementById('lopt-pt').classList.toggle('active', l === 'pt');
+  document.getElementById('lopt-en').classList.toggle('active', l === 'en');
+
+  // header tabs
+  document.getElementById('btn-run').textContent    = t('tab_run');
+  document.getElementById('btn-review').textContent = t('tab_review');
+  if (!currentSession) document.getElementById('session-bar').textContent = t('no_session');
+
+  // run tab static elements
+  document.getElementById('topic-input').placeholder = t('topic_ph');
+  document.querySelector('.btn-all').textContent    = t('btn_all');
+  document.querySelector('.btn-sel').textContent    = t('btn_sel');
+  document.getElementById('log-header').textContent = t('log_header');
+
+  // review tab static elements
+  document.getElementById('sidebar-header').textContent = t('sidebar_header');
+  const fbLbl = document.querySelector('.fb-lbl');
+  if (fbLbl) fbLbl.textContent = t('fb_label');
+  const fbInput = document.querySelector('.fb-input');
+  if (fbInput) fbInput.placeholder = t('fb_ph');
+  document.querySelector('.mbtn-ok').textContent = t('btn_approve');
+  document.querySelector('.mbtn-ng').textContent = t('btn_reject');
+  const rerunBtn = document.getElementById('btn-rerun');
+  if (rerunBtn && !rerunBtn.disabled) rerunBtn.textContent = t('btn_rerun');
+
+  const zoomHint = document.querySelector('#design-img-wrap div');
+  if (zoomHint) zoomHint.textContent = t('zoom_hint');
+
+  // review empty state
+  document.getElementById('review-empty').innerHTML =
+    t('review_empty').replace('\n','<br>');
+
+  // session list empty state if showing
+  const list = document.getElementById('session-list');
+  const emptyDiv = list?.querySelector('div');
+  if (emptyDiv && !list.querySelector('.sess-item')) {
+    emptyDiv.textContent = t('no_sessions');
+  }
+
+  // re-render agent bars (updates status text)
+  AGENTS.forEach(ag => {
+    const raw = agentStatuses[ag.id] || 'idle';
+    const lbl = document.getElementById(`ast-${ag.id}`);
+    if (lbl) lbl.textContent = barLabel(raw);
+  });
+
+  // update content status badge if visible
+  const badge = document.getElementById('content-status');
+  if (badge && badge.className) {
+    badge.textContent = t(`b_${badge.className}`) || badge.textContent;
+  }
+}
+
+function barLabel(status) {
+  const map = {
+    idle:'s_idle', running:'s_running', gerando:'s_running',
+    done:'s_done', aguardando:'s_done', error:'s_error',
+    aprovado:'s_aprovado', rejeitado:'s_rejeitado',
+  };
+  return t(map[status] || 's_idle');
+}
+
+// ═══════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════
+buildAgentsGrid();
+loadSessions();
+setInterval(loadSessions, 30000);
+setLang(lang); // apply saved language on load
+</script>
+</body>
+</html>

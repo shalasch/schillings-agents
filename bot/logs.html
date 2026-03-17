@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SHELLY — Conversas</title>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+:root{
+  --bg:#1a1f3c;--dark:#0d1020;--panel:#141830;
+  --blue:#1B3A8C;--blue2:#4a90d9;
+  --red:#E8202A;--green:#64c850;--yellow:#f8d030;
+  --gray:#a0a8d0;--white:#f0f0f0;--cream:#f8f4e8;
+  --border:#000;--font:'Press Start 2P',monospace;
+}
+html,body{height:100%;overflow:hidden;background:var(--dark);font-family:var(--font);color:var(--white);}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent 0,transparent 3px,rgba(0,0,0,.11) 3px,rgba(0,0,0,.11) 4px);}
+::-webkit-scrollbar{width:6px;}
+::-webkit-scrollbar-track{background:var(--dark);}
+::-webkit-scrollbar-thumb{background:var(--blue);}
+
+/* shell */
+#app{display:flex;flex-direction:column;height:100vh;}
+
+/* header */
+#header{
+  height:48px;flex-shrink:0;background:var(--dark);border-bottom:4px solid var(--border);
+  display:flex;align-items:center;padding:0 14px;gap:10px;
+}
+#logo{font-size:10px;color:var(--yellow);letter-spacing:2px;}
+#logo span{font-size:7px;color:var(--gray);margin-left:6px;}
+.dot{width:8px;height:8px;background:var(--green);animation:blink .9s step-end infinite;}
+
+/* layout */
+#main{flex:1;display:flex;overflow:hidden;}
+
+/* sidebar */
+#sidebar{
+  width:240px;flex-shrink:0;border-right:4px solid var(--border);
+  background:var(--panel);display:flex;flex-direction:column;
+}
+#sidebar-hdr{
+  padding:10px 10px;background:var(--dark);border-bottom:3px solid var(--border);
+  font-size:6px;color:var(--yellow);letter-spacing:1px;flex-shrink:0;display:flex;align-items:center;gap:6px;
+}
+#conv-count{font-size:5px;color:var(--gray);}
+#conv-list{flex:1;overflow-y:auto;}
+
+.conv-item{
+  padding:10px 10px;border-bottom:2px solid var(--bg);cursor:pointer;
+}
+.conv-item:hover{background:rgba(74,144,217,.18);}
+.conv-item.active{background:rgba(100,200,80,.12);border-left:4px solid var(--green);}
+.conv-phone{font-size:7px;color:var(--blue2);margin-bottom:3px;}
+.conv-preview{font-size:6px;color:var(--gray);line-height:1.7;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.conv-meta{font-size:5px;color:var(--panel);margin-top:3px;}
+
+/* chat */
+#chat{flex:1;display:flex;flex-direction:column;background:#0e1222;}
+#chat-hdr{
+  padding:10px 14px;background:var(--dark);border-bottom:3px solid var(--border);
+  font-size:7px;color:var(--yellow);display:flex;align-items:center;gap:8px;flex-shrink:0;
+}
+#chat-phone{font-size:7px;color:var(--blue2);}
+#chat-count{margin-left:auto;font-size:5px;color:var(--gray);}
+
+#messages{
+  flex:1;overflow-y:auto;padding:14px;
+  display:flex;flex-direction:column;gap:8px;
+}
+#empty{
+  flex:1;display:flex;align-items:center;justify-content:center;
+  font-size:7px;color:var(--gray);text-align:center;line-height:2.5;
+}
+
+.msg{max-width:74%;padding:9px 11px;font-size:7px;line-height:1.9;}
+.msg-user{
+  align-self:flex-end;
+  background:#1e3060;border:3px solid var(--blue2);box-shadow:3px 3px 0 var(--border);
+  color:var(--white);
+}
+.msg-assistant{
+  align-self:flex-start;
+  background:var(--cream);border:3px solid var(--border);box-shadow:3px 3px 0 var(--border);
+  color:#1a1a2a;
+}
+.msg-ts{font-size:5px;color:var(--gray);display:block;margin-top:4px;text-align:right;}
+
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <div id="header">
+    <div class="dot"></div>
+    <div id="logo">SHELLY<span> — CONVERSAS</span></div>
+  </div>
+
+  <div id="main">
+
+    <div id="sidebar">
+      <div id="sidebar-hdr">
+        ▸ CONTATOS
+        <span id="conv-count"></span>
+      </div>
+      <div id="conv-list"></div>
+    </div>
+
+    <div id="chat">
+      <div id="chat-hdr">
+        <span>💬</span>
+        <span id="chat-phone">selecione um contato</span>
+        <span id="chat-count"></span>
+      </div>
+      <div id="messages">
+        <div id="empty">← selecione um contato<br>para ver as mensagens</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+let current = null;
+
+async function loadList() {
+  const list = await fetch('/api/conversas').then(r => r.json()).catch(() => []);
+  const el   = document.getElementById('conv-list');
+  document.getElementById('conv-count').textContent = `(${list.length})`;
+
+  if (!list.length) {
+    el.innerHTML = '<div style="padding:12px;font-size:6px;color:var(--gray);text-align:center;line-height:2">nenhuma conversa</div>';
+    return;
+  }
+
+  el.innerHTML = list.map(c => `
+    <div class="conv-item${current === c.whatsapp ? ' active' : ''}"
+         onclick="selectConv('${c.whatsapp}')">
+      <div class="conv-phone">${fmt(c.whatsapp)}</div>
+      <div class="conv-preview">${esc(c.ultimaMensagem)}</div>
+      <div class="conv-meta">${c.total} msgs · ${fmtTs(c.ultimaAtividade)}</div>
+    </div>
+  `).join('');
+}
+
+async function selectConv(whatsapp) {
+  current = whatsapp;
+  document.getElementById('chat-phone').textContent = fmt(whatsapp);
+
+  const { mensagens = [] } = await fetch(`/api/conversa/${whatsapp}`)
+    .then(r => r.json()).catch(() => ({ mensagens: [] }));
+
+  document.getElementById('chat-count').textContent = `${mensagens.length} msgs`;
+
+  const el = document.getElementById('messages');
+  document.getElementById('empty')?.remove();
+
+  if (!mensagens.length) {
+    el.innerHTML = '<div style="padding:16px;font-size:6px;color:var(--gray);text-align:center">sem mensagens</div>';
+    return;
+  }
+
+  el.innerHTML = mensagens.map(m => `
+    <div class="msg msg-${m.role}">
+      ${esc(m.content)}
+      <span class="msg-ts">${fmtTs(m.ts)}</span>
+    </div>
+  `).join('');
+
+  el.scrollTop = el.scrollHeight;
+  await loadList(); // refresh active state
+}
+
+function fmt(p) {
+  const d = String(p).replace(/\D/g, '');
+  if (d.length === 13) return `+${d.slice(0,2)} (${d.slice(2,4)}) ${d.slice(4,9)}-${d.slice(9)}`;
+  if (d.length === 11) return `(${d.slice(0,2)}) ${d.slice(2,7)}-${d.slice(7)}`;
+  return p;
+}
+
+function fmtTs(ts) {
+  if (!ts) return '';
+  return new Date(ts).toLocaleString('pt-BR', {day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+function esc(s = '') {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/\n/g,'<br>');
+}
+
+loadList();
+setInterval(loadList, 15000);
+</script>
+</body>
+</html>
