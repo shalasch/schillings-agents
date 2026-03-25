@@ -10,12 +10,17 @@ import Anthropic from '@anthropic-ai/sdk';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { getAluno } from './db.js';
+import { getAlunoByTelefone } from './airtable.js';
 
 const __dirname  = path.dirname(fileURLToPath(import.meta.url));
 const PROMPT_FILE = path.resolve(__dirname, '..', 'prompts', 'secretaria-bot.md');
 
 const client = new Anthropic();
+
+const BOT_LANGUAGE = process.env.BOT_LANGUAGE ?? 'pt';
+const LANGUAGE_INSTRUCTION = BOT_LANGUAGE === 'en'
+  ? '\n\nIMPORTANT: You must respond exclusively in English, regardless of the language the user writes in.'
+  : '\n\nIMPORTANTE: Responda sempre em português, independentemente do idioma usado pelo usuário.';
 
 // ── system prompt ─────────────────────────────────────────────────────────────
 
@@ -25,7 +30,7 @@ async function buildSystemPrompt(de) {
   );
 
   // Contexto do aluno (se cadastrado)
-  const aluno = await getAluno(de);
+  const aluno = await getAlunoByTelefone(de);
   let contexto = '';
   if (aluno) {
     contexto = `
@@ -47,7 +52,7 @@ async function buildSystemPrompt(de) {
 `;
   }
 
-  return base + contexto;
+  return base + contexto + LANGUAGE_INSTRUCTION;
 }
 
 // ── reply ─────────────────────────────────────────────────────────────────────

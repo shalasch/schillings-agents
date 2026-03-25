@@ -18,7 +18,7 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
-import { receiveMessage, sendMessage }              from './whatsapp.js';
+import { receiveMessage, sendMessage, resolveContactJid } from './whatsapp.js';
 import { reply }                                    from './shelly.js';
 import { getConversa, saveConversa, listConversas } from './db.js';
 import './cron.js';
@@ -27,7 +27,28 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app  = express();
 const PORT = process.env.BOT_PORT ?? 3002;
 
-app.use(express.json());
+// Parse JSON mesmo que Content-Type venha errado (tunnels como Cloudflare às vezes mandam text/plain)
+app.use((req, res, next) => {
+  express.json({ type: '*/*' })(req, res, (err) => {
+    if (err) {
+      // Tenta parse manual se express.json falhar
+      let raw = '';
+      req.on('data', chunk => { raw += chunk; });
+      req.on('end', () => {
+        try { req.body = JSON.parse(raw); } catch { req.body = {}; }
+        next();
+      });
+    } else {
+      next();
+    }
+  });
+});
+
+// ── GET /webhook — verificação de tunnel (ngrok/cloudflare fazem probe GET) ──
+
+app.get('/webhook', (req, res) => {
+  res.status(200).send('OK');
+});
 
 // ── POST /webhook ─────────────────────────────────────────────────────────────
 
@@ -35,17 +56,37 @@ app.post('/webhook', async (req, res) => {
   // Responde 200 imediatamente para a Evolution API não reenviar
   res.sendStatus(200);
 
-  const parsed = receiveMessage(req);
-  if (!parsed) return; // evento ignorado (fromMe, não-mensagem, etc.)
+  console.log(`[webhook] POST recebido — Content-Type: ${req.headers['content-type'] ?? 'n/a'}`);
 
-  const { de, mensagem } = parsed;
-  console.log(`[webhook] ← ${de}: ${mensagem.slice(0, 80)}`);
+  const parsed = receiveMessage(req);
+  if (!parsed) return; // evento ignorado (fromMe, não-mensagem, tipo errado, etc.)
+
+  const { de: deRaw, jid, pushName, mensagem } = parsed;
+  console.log(`[webhook] ← ${deRaw} (${jid}): ${mensagem.slice(0, 80)}`);
 
   try {
+    // Resolve @lid para JID real antes de tudo, para usar o número real no Airtable
+    let destJid = jid;
+    if (jid.endsWith('@lid')) {
+      destJid = await resolveContactJid(jid, pushName);
+      if (!destJid) {
+        const fallback = process.env.FALLBACK_JID;
+        if (fallback) {
+          console.warn(`[webhook] @lid não resolvido — usando FALLBACK_JID: ${fallback}`);
+          destJid = fallback;
+        } else {
+          console.warn(`[webhook] @lid não resolvido — mensagem ignorada para ${jid}`);
+          return;
+        }
+      }
+    }
+
+    // Usa o número do JID resolvido para histórico e lookup no Airtable
+    const de = destJid.replace(/@s\.whatsapp\.net$/, '').replace(/\D/g, '') || deRaw;
+
     const { mensagens } = await getConversa(de);
 
     const resposta = await reply({ de, mensagem, historico: mensagens });
-    console.log(`[webhook] → ${de}: ${resposta.slice(0, 80)}`);
 
     await saveConversa(de, [
       ...mensagens,
@@ -53,10 +94,12 @@ app.post('/webhook', async (req, res) => {
       { role: 'assistant', content: resposta, ts: new Date().toISOString() },
     ]);
 
-    await sendMessage(de, resposta);
+    console.log(`[webhook] → ${destJid}: ${resposta.slice(0, 80)}`);
+    await sendMessage(destJid, resposta);
 
   } catch (err) {
-    console.error('[webhook] erro:', err.message);
+    console.error('[webhook] erro ao processar mensagem:', err.message);
+    console.error(err.stack);
   }
 });
 

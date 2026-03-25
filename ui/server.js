@@ -52,7 +52,7 @@ async function setStatus(date, topic, agent, status) {
 
 // ─── agente rerun ────────────────────────────────────────────────────────────
 
-async function buildPrompt(agent, topic, feedback) {
+async function buildPrompt(agent, topic, feedback, lang) {
   const SEO_FILE = path.join(ROOT, 'prompts', 'seo-linkedin-email-funil-ads.md');
   const SEPARATOR = /\n---\n---/;
 
@@ -89,16 +89,20 @@ async function buildPrompt(agent, topic, feedback) {
 
   let prompt = template.replace(/\{topic\}/g, topic);
 
+  if (lang === 'en') {
+    prompt += `\n\n---\n## LANGUAGE INSTRUCTION — CRITICAL\nThe entire output MUST be in English. This is non-negotiable and overrides all other instructions.\n\nThis applies to EVERYTHING without exception:\n- Section headers and labels (e.g. "DETECTED AUDIENCE" not "PÚBLICO DETECTADO", "Tone:" not "Tom:", "SOCIAL MEDIA HOOKS" not "HOOKS PARA REDES SOCIAIS", "VERSION A (Pain-based)" not "VERSÃO A (Baseada na dor)", "BENEFIT BULLETS" not "BULLETS DE BENEFÍCIO")\n- All body text, headlines, subheadlines, bullets, CTAs\n- Structural markers, field names, category labels\n- Examples, captions, hashtag descriptions\n- Any word or phrase in the output\n\nDo NOT output a single word in Portuguese. Translate every structural label from the prompt template into English before outputting it.`;
+  }
+
   if (feedback) {
-    prompt += `\n\n---\n## REVISÃO SOLICITADA\n${feedback}\n\nRegeregere o conteúdo aplicando o feedback acima.`;
+    prompt += `\n\n---\n## REVISÃO SOLICITADA\n${feedback}\n\nRegere o conteúdo aplicando o feedback acima.`;
   }
 
   return prompt;
 }
 
-async function rerunAgent(agent, topic, date, feedback) {
+async function rerunAgent(agent, topic, date, feedback, lang) {
   const slug    = toSlug(topic);
-  const prompt  = await buildPrompt(agent, topic, feedback);
+  const prompt  = await buildPrompt(agent, topic, feedback, lang);
   const outDir  = path.join(OUTPUTS, date, slug);
   await fs.ensureDir(outDir);
 
@@ -170,7 +174,7 @@ app.get('/api/session/:date/:topic', async (req, res) => {
     const dir = path.join(OUTPUTS, date, topic);
     if (!await fs.pathExists(dir)) return res.status(404).json({ error: 'not found' });
 
-    const agents = ['copy', 'posts', 'seo', 'linkedin', 'email', 'funil', 'anuncio', 'design'];
+    const agents = ['copy', 'posts', 'seo', 'linkedin', 'email', 'funil', 'anuncio'];
     const result = [];
     for (const agent of agents) {
       const file   = agentFile(agent);
@@ -257,9 +261,9 @@ app.post('/api/content-save/:date/:topic/:agent', async (req, res) => {
 app.post('/api/rerun/:date/:topic/:agent', async (req, res) => {
   try {
     const { date, topic, agent } = req.params;
-    const { feedback = '' } = req.body;
+    const { feedback = '', lang = 'pt' } = req.body;
     await setStatus(date, topic, agent, 'gerando');
-    const output = await rerunAgent(agent, topic, date, feedback);
+    const output = await rerunAgent(agent, topic, date, feedback, lang);
     await setStatus(date, topic, agent, 'aguardando');
     res.json({ ok: true, output });
   } catch (e) {
@@ -269,15 +273,14 @@ app.post('/api/rerun/:date/:topic/:agent', async (req, res) => {
 
 // GET /api/run — SSE stream (roda agentes em sequência)
 app.get('/api/run', async (req, res) => {
-  const { topic, agents, date } = req.query;
+  const { topic, agents, date, lang = 'pt' } = req.query;
   if (!topic) return res.status(400).end('topic required');
 
   const slug     = toSlug(topic);
   const runDate  = date || new Date().toISOString().slice(0, 10);
-  const ORDER    = ['copy','posts','seo','linkedin','email','funil','anuncio','design'];
+  const ORDER    = ['copy','posts','seo','linkedin','email','funil','anuncio'];
   const agentList = agents ? agents.split(',').filter(a => ORDER.includes(a)) : ORDER;
-  // design sempre por último
-  const queue = [...agentList.filter(a => a !== 'design'), ...(agentList.includes('design') ? ['design'] : [])];
+  const queue = agentList;
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -289,24 +292,118 @@ app.get('/api/run', async (req, res) => {
 
   await fs.ensureDir(path.join(OUTPUTS, runDate, slug));
   send({ agent: '_start', status: 'start', date: runDate, topic: slug,
-         message: `Iniciando ${queue.length} agentes para "${topic}"` });
+         msgKey: 'log_starting_agents', msgArgs: { count: queue.length, topic } });
 
   for (const agent of queue) {
     await setStatus(runDate, slug, agent, 'gerando');
-    send({ agent, status: 'running', message: `${agent.toUpperCase()} está gerando conteúdo...` });
+    send({ agent, status: 'running', msgKey: 'log_agent_running', msgArgs: { agent: agent.toUpperCase() } });
     try {
-      await rerunAgent(agent, topic, runDate, '');
+      await rerunAgent(agent, topic, runDate, '', lang);
       await setStatus(runDate, slug, agent, 'aguardando');
-      send({ agent, status: 'done', message: `${agent.toUpperCase()} concluído com sucesso!` });
+      send({ agent, status: 'done', msgKey: 'log_agent_done', msgArgs: { agent: agent.toUpperCase() } });
     } catch (e) {
       await setStatus(runDate, slug, agent, 'aguardando');
-      send({ agent, status: 'error', message: `${agent.toUpperCase()} falhou: ${e.message}` });
+      send({ agent, status: 'error', msgKey: 'log_agent_error', msgArgs: { agent: agent.toUpperCase(), err: e.message } });
     }
   }
 
   send({ agent: '_end', status: 'complete', date: runDate, topic: slug,
-         message: 'Todos os agentes finalizaram!' });
+         msgKey: 'log_all_done' });
   res.end();
+});
+
+// GET /api/queue
+app.get('/api/queue', async (req, res) => {
+  try {
+    const qf = path.join(ROOT, 'outputs', 'queue.json');
+    if (!await fs.pathExists(qf)) return res.json([]);
+    res.json(await fs.readJson(qf));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/queue/:id
+app.delete('/api/queue/:id', async (req, res) => {
+  try {
+    const qf = path.join(ROOT, 'outputs', 'queue.json');
+    if (!await fs.pathExists(qf)) return res.json({ ok: true });
+    const queue = await fs.readJson(qf);
+    const filtered = queue.filter(item => item.id !== req.params.id);
+    await fs.writeJson(qf, filtered, { spaces: 2 });
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// DELETE /api/session/:date/:topic
+app.delete('/api/session/:date/:topic', async (req, res) => {
+  try {
+    const { date, topic } = req.params;
+    const dir = path.join(OUTPUTS, date, topic);
+    if (!await fs.pathExists(dir)) return res.status(404).json({ error: 'not found' });
+    await fs.remove(dir);
+    // Remove a pasta de data se estiver vazia
+    const dateDir = path.join(OUTPUTS, date);
+    const remaining = await fs.readdir(dateDir);
+    if (remaining.length === 0) await fs.remove(dateDir);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/plans — list all saved plans (newest first)
+app.get('/api/plans', async (req, res) => {
+  try {
+    const plansDir = path.join(ROOT, 'outputs', 'plans');
+    if (!await fs.pathExists(plansDir)) return res.json([]);
+    const files = (await fs.readdir(plansDir))
+      .filter(f => f.endsWith('.json'))
+      .sort().reverse();
+    const list = await Promise.all(files.map(async f => {
+      const p = await fs.readJson(path.join(plansDir, f));
+      return { id: p.id || f.replace('.json',''), generatedAt: p.generatedAt, preview: (p.analysis || '').slice(0, 80) };
+    }));
+    res.json(list);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/plans/:id — get a specific plan
+app.get('/api/plans/:id', async (req, res) => {
+  try {
+    const planPath = path.join(ROOT, 'outputs', 'plans', req.params.id + '.json');
+    if (!await fs.pathExists(planPath)) return res.status(404).json({ error: 'not found' });
+    res.json(await fs.readJson(planPath));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// GET /api/plan
+app.get('/api/plan', async (req, res) => {
+  try {
+    const pf = path.join(ROOT, 'outputs', 'plan.json');
+    if (!await fs.pathExists(pf)) return res.status(404).json({ error: 'not found' });
+    res.json(await fs.readJson(pf));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// POST /api/orchestrator
+app.post('/api/orchestrator', async (req, res) => {
+  try {
+    const { runOrchestrator } = await import('../agents/orchestrator.js');
+    const { lang = 'pt' } = req.body || {};
+    const plan = await runOrchestrator(lang);
+    res.json(plan);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 // ─── start ───────────────────────────────────────────────────────────────────

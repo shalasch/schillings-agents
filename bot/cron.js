@@ -39,6 +39,8 @@ async function dispatch(whatsapp, mensagem, contexto) {
   }
 }
 
+if (process.env.CRON_ENABLED === 'true') {
+
 // ── 08:00 — lembrete: aulas do dia ───────────────────────────────────────────
 
 cron.schedule('0 8 * * *', async () => {
@@ -86,3 +88,7 @@ cron.schedule('0 9 * * *', async () => {
 });
 
 console.log('[cron] Jobs ativos: 08:00 (aulas do dia) · 18:00 (véspera) · 09:00 (cobranças)');
+
+} else {
+  console.log('[cron] Jobs desativados (CRON_ENABLED !== "true")');
+}

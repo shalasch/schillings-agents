@@ -54,6 +54,21 @@ export async function runAnuncio(topic) {
 
   console.log(chalk.green(`✓ Anúncios gerados para "${topic}" → outputs/${todayFolder()}/${slug}/anuncio.md`));
 
+  const translationResponse = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 2000,
+    messages: [{ role: 'user', content: `Translate the following marketing content to English, preserving all formatting, structure, and markdown:\n\n${output}` }],
+  });
+
+  const outputEn = translationResponse.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+
+  await fs.writeFile(path.join(outputDir, 'anuncio-en.md'), outputEn, 'utf-8');
+
+  console.log(chalk.green(`✓ Anúncios (EN) gerados → outputs/${todayFolder()}/${slug}/anuncio-en.md`));
+
   return output;
 }
 

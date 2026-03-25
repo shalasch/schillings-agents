@@ -54,6 +54,21 @@ export async function runLinkedin(topic) {
 
   console.log(chalk.green(`✓ LinkedIn gerado para "${topic}" → outputs/${todayFolder()}/${slug}/linkedin.md`));
 
+  const translationResponse = await client.messages.create({
+    model: 'claude-sonnet-4-20250514',
+    max_tokens: 2000,
+    messages: [{ role: 'user', content: `Translate the following marketing content to English, preserving all formatting, structure, and markdown:\n\n${output}` }],
+  });
+
+  const outputEn = translationResponse.content
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text)
+    .join('\n');
+
+  await fs.writeFile(path.join(outputDir, 'linkedin-en.md'), outputEn, 'utf-8');
+
+  console.log(chalk.green(`✓ LinkedIn (EN) gerado → outputs/${todayFolder()}/${slug}/linkedin-en.md`));
+
   return output;
 }
 

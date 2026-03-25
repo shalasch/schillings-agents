@@ -24,7 +24,7 @@ const BASE_ID = process.env.AIRTABLE_BASE_ID ?? '';
 // ── nomes de tabelas e campos ─────────────────────────────────────────────────
 // Centraliza aqui: quando novos campos/tabelas chegarem, só atualiza estas constantes.
 
-const TABELA_ALUNOS    = "MATRÍCULA SCHILLING'S - Respostas ao formulário 1";
+const TABELA_ALUNOS    = 'Imported table';
 const CAMPO_NOME       = 'Nome completo';
 const CAMPO_TELEFONE   = 'Telefone';
 const CAMPO_EMAIL      = 'Endereço de e-mail';
