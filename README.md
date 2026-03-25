@@ -1,4 +1,7 @@
 # Schilling's Content Agents
+
+![Demo](assets/demo.gif)
+
 Multi-agent content automation system for Schilling's English Course.
 Built with Node.js, Claude API, Express, Puppeteer and Evolution API.
 
