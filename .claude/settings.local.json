@@ -8,7 +8,27 @@
       "Skill(update-config)",
       "Bash(find /c/Users/Shala/Desktop/schillings-agents -not -path */node_modules/* -not -path */outputs/* -newer /c/Users/Shala/Desktop/schillings-agents/package.json -type f)",
       "Bash(find /c/Users/Shala/Desktop/schillings-agents -not -path */node_modules/* -not -path */outputs/* -type f -printf '%T@ %p\\\\n')",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(git push:*)",
+      "Bash(ls /c/Users/Shala/Desktop/schillings-agents/*.env*)",
+      "Bash(node tools/test-airtable.js)",
+      "Bash(node bot/server.js)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3002)",
+      "Bash(taskkill /PID 7580 /F)",
+      "Bash(cmd /c \"taskkill /PID 7580 /F\")",
+      "Bash(curl:*)",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(findstr -v \":49\\\\|:50\\\\|:51\\\\|:52\\\\|:53\\\\|:54\\\\|:55\\\\|:56\\\\|:57\\\\|:58\\\\|:59\\\\|:60\\\\|:61\\\\|:62\\\\|:63\\\\|:64\\\\|:65\")",
+      "Bash(powershell -Command \"Stop-Process -Id 7580 -Force\")",
+      "Bash(docker exec:*)",
+      "Bash(python -m json.tool)",
+      "Bash(docker restart:*)",
+      "Bash(find C:/Users/Shala/Desktop -name docker-compose*)",
+      "Bash(docker compose:*)",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3002 -State Listen | Select-Object -ExpandProperty OwningProcess | ForEach-Object { Stop-Process -Id $_ -Force }\")",
+      "Bash(powershell -Command \"Stop-Process -Id \\(Get-NetTCPConnection -LocalPort 3002 -State Listen\\).OwningProcess -Force\")",
+      "Bash(node -e \":*)"
     ]
   }
 }
